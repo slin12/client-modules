@@ -31,12 +31,8 @@ export class API {
     const uri = new URL(endpoint, this.apiBaseUrl);
 
     const user = await this.getCurrentUser();
-    query = {
-      ...query,
-      authentication_token: user.auth_token,
-    };
-
     const searchParams = new URLSearchParams(uri.search);
+    searchParams.set('authentication_token', user.auth_token);
     for (const [k, v] of Object.entries(query)) {
       searchParams.set(k, v.toString());
     }
@@ -64,7 +60,7 @@ export class API {
     const response = await fetch(uri.toString(), {
       method: 'POST',
       headers,
-      body: Object.keys(data) ? JSON.stringify(data) : undefined,
+      body: JSON.stringify(data),
       credentials: 'include',
     });
 
