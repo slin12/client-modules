@@ -14,10 +14,7 @@
     "@babel/preset-typescript": "^7.10.4",
     "@types/jsuri": "^1.3.30",
     "@types/superagent": "^4.1.10",
-    "babel-preset-codecademy": "^2.3.0",
-    "jsuri": "^1.3.1",
-    "superagent": "^6.1.0",
-    "typescript": "^4.0.2"
+    "babel-preset-codecademy": "^2.3.0"
   },
   "scripts": {
     "verify": "tsc --noEmit",

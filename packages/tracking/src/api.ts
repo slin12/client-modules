@@ -1,48 +1,109 @@
-import Uri from 'jsuri';
+import { User } from './types';
 
-export type RequestParams = {
-  endpoint: string;
-  data?: any;
-  query?: any;
-  headers?: any;
-  method?: string;
-};
+type BasicStringable =
+  | string
+  | number
+  | boolean
+  | {
+      toString(): string;
+    };
 
-// Requests for the main app
-export async function requestAPI<T>({
-  endpoint,
-  data = {},
-  query = {},
-  headers = {},
-  method = 'GET',
-}: RequestParams): Promise<T> {
-  const hasDataArg = data && Object.keys(data).length;
-  const hasQueryArg = query && Object.keys(query).length;
+export class API {
+  apiBaseUrl: string;
+  user?: User;
 
-  if ((method === 'GET' || method === 'HEAD') && hasDataArg) {
-    throw new Error(
-      "GET and HEAD requests do not have data objects, only query params are allowed, please make sure you're using the correct method"
-    );
-  }
+  userRequest: Promise<User> | undefined;
 
-  const combinedHeaders = {
+  defaultHeaders = {
     'Content-type': 'application/json',
     Accept: 'application/json',
-    ...headers,
   };
 
-  const uri = new Uri('https://www.codecademy.com').setPath(`/${endpoint}`);
-
-  if (hasQueryArg) {
-    uri.setQuery(query);
+  constructor(api_base_url: string) {
+    this.apiBaseUrl = api_base_url;
   }
 
-  const response = await fetch(uri.toString(), {
-    body: hasDataArg ? JSON.stringify(data) : undefined,
-    headers: combinedHeaders,
-    method: method.toUpperCase(),
-    credentials: 'same-origin',
-  });
+  async get<T>(
+    endpoint: string,
+    query: Record<string, BasicStringable> = {}
+  ): Promise<T> {
+    const headers = this.defaultHeaders;
+    const uri = new URL(endpoint, this.apiBaseUrl);
 
-  return response.json();
+    const user = await this.getCurrentUser();
+    query = {
+      ...query,
+      authentication_token: user.auth_token,
+    };
+
+    const searchParams = new URLSearchParams(uri.search);
+    for (const [k, v] of Object.entries(query)) {
+      searchParams.set(k, v.toString());
+    }
+    uri.search = searchParams.toString();
+
+    const response = await fetch(uri.toString(), {
+      method: 'GET',
+      headers,
+      credentials: 'include',
+    });
+
+    return response.json();
+  }
+
+  async post<T>(endpoint: string, data = {}): Promise<T> {
+    const headers = this.defaultHeaders;
+    const uri = new URL(endpoint, this.apiBaseUrl);
+
+    const user = await this.getCurrentUser();
+    data = {
+      ...data,
+      authentication_token: user.auth_token,
+    };
+
+    const response = await fetch(uri.toString(), {
+      method: 'POST',
+      headers,
+      body: Object.keys(data) ? JSON.stringify(data) : undefined,
+      credentials: 'include',
+    });
+
+    return response.json();
+  }
+
+  async beacon(endpoint: string, data: Record<string, BasicStringable>) {
+    const uri = new URL(endpoint, this.apiBaseUrl);
+
+    const user = await this.getCurrentUser();
+    const searchParams = new URLSearchParams(uri.search);
+    searchParams.set('authentication_token', user.auth_token);
+    uri.search = searchParams.toString();
+
+    const form = new FormData();
+    for (const [k, v] of Object.entries(data)) {
+      form.append(k, v.toString());
+    }
+
+    navigator.sendBeacon(uri.toString(), form);
+  }
+
+  async getCurrentUser(): Promise<User> {
+    if (this.user) {
+      return this.user;
+    }
+
+    // Prevent multiple concurrent requests to the user endpoint
+    if (!this.userRequest) {
+      this.userRequest = this.get<User>('users/web');
+    }
+
+    this.user = await this.userRequest;
+    this.userRequest = undefined;
+
+    return this.user;
+  }
+
+  setCurrentUser(user?: User) {
+    this.user = user;
+  }
 }

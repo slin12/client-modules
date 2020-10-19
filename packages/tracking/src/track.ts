@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
-import { beacon } from './beacon';
-import {
+import { API } from './api';
+
+import type {
   TrackingOptions,
   EventDataTypes,
   UserClickData,
@@ -8,17 +9,15 @@ import {
 } from './types';
 
 export class Track {
-  authToken: string;
-  userID: string;
+  api: API;
   verbose: boolean;
 
-  constructor(auth_token: string, user_id: string, verbose = false) {
-    this.authToken = auth_token;
-    this.userID = user_id;
+  constructor(api: API, verbose = false) {
+    this.api = api;
     this.verbose = verbose;
   }
 
-  event<
+  async event<
     Category extends keyof EventDataTypes,
     Event extends keyof EventDataTypes[Category],
     Data extends EventDataTypes[Category][Event]
@@ -39,12 +38,6 @@ export class Track {
       url: window.location.href,
     };
 
-    const data = new FormData();
-    data.append('category', category);
-    data.append('event', event as string);
-    data.append('properties', JSON.stringify(properties));
-    data.append('gdpr_safe', `${options.gdprSafe}`);
-
     if (this.verbose) {
       console.groupCollapsed(
         `%cTracking Event Fired: ${category}:${event}`,
@@ -58,22 +51,19 @@ export class Track {
       console.groupEnd();
     }
 
-    // Use navigator.sendBeacon if possible to ensure
-    // Data is sent even if the page is unloaded
-    // Falls back to XHR
-    beacon(
-      `https://www.codecademy.com/analytics/${category}`,
-      data,
-      this.authToken,
-      this.userID
-    );
+    this.api.beacon(`/analytics/${category}`, {
+      category,
+      event: event as string,
+      properties: JSON.stringify(properties),
+      gdpr_safe: `${options.gdprSafe}`,
+    });
   }
 
-  click(data: UserClickData) {
+  async click(data: UserClickData) {
     this.event('user', 'click', data);
   }
 
-  visit(data: UserVisitData) {
+  async visit(data: UserVisitData) {
     this.event('user', 'visit', data);
   }
 
